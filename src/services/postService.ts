@@ -5,7 +5,6 @@ import { AppError } from '../middleware/errorHandler.js';
 export async function listPosts(
   page = 1,
   limit = 10,
-  published?: boolean,
   author?: string,
   query?: string
 ) {
@@ -19,11 +18,9 @@ export async function listPosts(
   const skip = (page - 1) * limit;
   const search = query?.trim();
 
-  const filter: QueryFilter<mongoose.Document> = {};
-
-  if (published !== undefined) {
-    filter.published = published;
-  }
+  const filter: QueryFilter<mongoose.Document> = {
+    published: true,
+  };
 
   if (author !== undefined) {
     filter.author = author;
@@ -54,8 +51,8 @@ export async function listPosts(
 }
 
 export async function getPostById(postId: string) {
-  const post = await Post.findByIdAndUpdate(
-    postId,
+  const post = await Post.findOneAndUpdate(
+    { _id: postId, published: true },
     { $inc: { views: 1 } },
     { new: true }
   );
@@ -150,6 +147,10 @@ export async function addComment(
     throw new AppError('User ID is required', 400);
   }
 
+  if (!mongoose.isObjectIdOrHexString(userId)) {
+    throw new AppError('Invalid user ID', 400);
+  }
+
   if (!content?.trim()) {
     throw new AppError('Comment content is required', 400);
   }
@@ -167,6 +168,11 @@ export async function toggleLike(postId: string, userId: string) {
   if (!userId) {
     throw new AppError('User ID is required', 400);
   }
+
+  if (!mongoose.isObjectIdOrHexString(userId)) {
+    throw new AppError('Invalid user ID', 400);
+  }
+
   await post.toggleLike(new mongoose.Types.ObjectId(userId));
   return post;
 }
@@ -179,6 +185,10 @@ export async function getPostsByAuthor(authorId: string, page = 1, limit = 10) {
 
   if (!Number.isInteger(limit) || limit < 1) {
     throw new AppError('Limit must be a positive integer', 400);
+  }
+
+  if (!mongoose.isObjectIdOrHexString(authorId)) {
+    throw new AppError('Invalid author ID', 400);
   }
 
   const [posts, total] = await Promise.all([
@@ -218,7 +228,10 @@ export async function searchPosts(query: string, page = 1, limit = 10) {
     throw new AppError('Limit must be a positive integer', 400);
   }
 
-  const filter: QueryFilter<mongoose.Document> = {};
+  const filter: QueryFilter<mongoose.Document> = {
+    published: true,
+  };
+
   if (!search) {
     throw new Error('Search query is required');
   }

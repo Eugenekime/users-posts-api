@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import * as postService from '../services/postService.js';
+import { AppError } from '../middleware/errorHandler.js';
 
 const router = Router();
 
@@ -8,21 +9,10 @@ router.get('/', async (req, res, next) => {
     const page = Number(req.query.page) || 1;
     const limit = Number(req.query.limit) || 10;
 
-    const published =
-      req.query.published === undefined
-        ? undefined
-        : req.query.published === 'true';
-
     const author = req.query.author?.toString();
     const query = req.query.query?.toString();
 
-    const result = await postService.listPosts(
-      page,
-      limit,
-      published,
-      author,
-      query
-    );
+    const result = await postService.listPosts(page, limit, author, query);
 
     res.status(200).json(result);
   } catch (error) {
@@ -81,8 +71,34 @@ router.get('/:postId', async (req, res, next) => {
 
 router.post('/', async (req, res, next) => {
   try {
-    const { authorId, ...input } = req.body;
+    const { title, content, published, authorId } = req.body;
 
+    if (!authorId) {
+      throw new AppError('AuthorId field not provided', 400);
+    }
+    if (typeof title !== 'string' || !title.trim()) {
+      throw new AppError('Title is required and must be a string', 400);
+    }
+
+    if (typeof content !== 'string' || !content.trim()) {
+      throw new AppError('Content is required and must be a string', 400);
+    }
+
+    if (published !== undefined && typeof published !== 'boolean') {
+      throw new AppError('Published must be a boolean', 400);
+    }
+    const input: {
+      title: string;
+      content: string;
+      published?: boolean;
+    } = {
+      title: title.trim(),
+      content: content.trim(),
+    };
+
+    if (published !== undefined) {
+      input.published = published;
+    }
     const post = await postService.createPost(authorId, input);
 
     res.status(201).json({ post });

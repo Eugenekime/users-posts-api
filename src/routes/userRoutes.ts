@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import * as userService from '../services/userService.js';
+import { AppError } from '../middleware/errorHandler.js';
 
 const router = Router();
 
@@ -69,7 +70,25 @@ router.post('/', async (req, res, next) => {
 
 router.patch('/:userId', async (req, res, next) => {
   try {
-    const user = await userService.updateUser(req.params.userId, req.body);
+    const allowedFields = [
+      'username',
+      'email',
+      'firstName',
+      'lastName',
+      'bio',
+      'avatar',
+    ] as const;
+
+    const input = Object.fromEntries(
+      allowedFields
+        .filter((field) => Object.hasOwn(req.body, field))
+        .map((field) => [field, req.body[field]])
+    );
+    if (Object.keys(input).length === 0) {
+      throw new AppError('No valid fields provided', 400);
+    }
+
+    const user = await userService.updateUser(req.params.userId, input);
 
     res.status(200).json({ user });
   } catch (error) {
